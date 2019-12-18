@@ -46,6 +46,12 @@ pub struct Manifest {
 
 impl Manifest {
     pub fn new(config_path: &Path) -> Result<Self, failure::Error> {
+        if !config_path.exists() {
+            failure::bail!(
+                "{} not found. Run wrangler init to start a new project",
+                config_path.display(),
+            );
+        }
         let config = read_config(config_path)?;
 
         let manifest: Manifest = match config.try_into() {
@@ -400,7 +406,8 @@ fn read_config(config_path: &Path) -> Result<Config, failure::Error> {
 
     let config_str = config_path
         .to_str()
-        .expect("project config path should be a string");
+        .expect("project config path should be valid unicode");
+
     config.merge(File::with_name(config_str))?;
 
     // Eg.. `CF_ACCOUNT_AUTH_KEY=farts` would set the `account_auth_key` key
