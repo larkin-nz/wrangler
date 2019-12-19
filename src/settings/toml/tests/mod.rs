@@ -10,13 +10,16 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::settings::environment::MockEnvironment;
+
 use wrangler_toml::{EnvConfig, WranglerToml, TEST_ENV_NAME};
 
 #[test]
 fn it_builds_from_config() {
     let toml_path = toml_fixture_path("default");
+    let test_environment = MockEnvironment::default();
 
-    let manifest = Manifest::new(&toml_path).unwrap();
+    let manifest = Manifest::new_from_file(&toml_path, test_environment).unwrap();
 
     let target = manifest.get_target(None).unwrap();
     assert!(target.kv_namespaces.is_none());
@@ -25,7 +28,8 @@ fn it_builds_from_config() {
 #[test]
 fn it_builds_from_environments_config() {
     let toml_path = toml_fixture_path("environments");
-    let manifest = Manifest::new(&toml_path).unwrap();
+    let test_environment = MockEnvironment::default();
+    let manifest = Manifest::new_from_file(&toml_path, test_environment).unwrap();
 
     let target = manifest.get_target(None).unwrap();
     assert!(target.kv_namespaces.is_none());
@@ -38,7 +42,8 @@ fn it_builds_from_environments_config() {
 fn it_builds_from_environments_config_with_kv() {
     let toml_path = toml_fixture_path("kv_namespaces");
 
-    let manifest = Manifest::new(&toml_path).unwrap();
+    let test_environment = MockEnvironment::default();
+    let manifest = Manifest::new_from_file(&toml_path, test_environment).unwrap();
 
     let target = manifest.get_target(None).unwrap();
     assert!(target.kv_namespaces.is_none());
@@ -90,9 +95,10 @@ fn parses_same_from_config_path_as_string() {
     let config_path = toml_fixture_path("environments.toml");
     eprintln!("{:?}", &config_path);
     let string_toml = fs::read_to_string(&config_path).unwrap();
+    let test_environment = MockEnvironment::default();
 
     let manifest_from_string = Manifest::new_from_string(string_toml).unwrap();
-    let manifest_from_config = Manifest::new(&config_path).unwrap();
+    let manifest_from_config = Manifest::new_from_file(&config_path, test_environment).unwrap();
 
     assert_eq!(manifest_from_config, manifest_from_string);
 }

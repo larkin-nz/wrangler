@@ -8,6 +8,7 @@ use config::{Config, File};
 use serde::{Deserialize, Serialize};
 
 use crate::commands::validate_worker_name;
+use crate::settings::environment::{Environment, QueryEnvironment};
 use crate::settings::toml::deploy_target::{DeployTarget, RouteConfig};
 use crate::settings::toml::kv_namespace::KvNamespace;
 use crate::settings::toml::site::Site;
@@ -16,6 +17,11 @@ use crate::settings::toml::EnvManifest;
 use crate::settings::toml::Target;
 use crate::terminal::emoji;
 use crate::terminal::message;
+
+const CF_ACCOUNT_ID: &str = "CF_ACCOUNT_ID";
+const CF_ZONE_ID: &str = "CF_ZONE_ID";
+
+static ENV_VAR_WHITELIST: [&str; 2] = [CF_ACCOUNT_ID, CF_ZONE_ID];
 
 fn some_string() -> Option<String> {
     Some("".to_string())
@@ -46,9 +52,25 @@ pub struct Manifest {
 }
 
 impl Manifest {
-        let config = read_config(config_path)?;
     pub fn standard() -> Result<Self, failure::Error> {
         let config_path = Path::new("./wrangler.toml");
+
+        // Eg.. `CF_ACCOUNT_AUTH_KEY=farts` would set the `account_auth_key` key
+        let environment = Environment::with_whitelist(ENV_VAR_WHITELIST.to_vec());
+
+        Self::new_from_file(config_path, environment)
+    }
+
+    pub fn new_from_file<T: 'static + QueryEnvironment>(
+        config_path: &Path,
+        environment: T,
+    ) -> Result<Self, failure::Error>
+    where
+        T: config::Source + Send + Sync,
+    {
+        let mut config = read_config(config_path)?;
+
+        config.merge(environment)?;
 
         let manifest: Manifest = match config.try_into() {
             Ok(m) => m,
@@ -330,9 +352,6 @@ fn read_config(config_path: &Path) -> Result<Config, failure::Error> {
         .to_str()
         .expect("project config path should be a string");
     config.merge(File::with_name(config_str))?;
-
-    // Eg.. `CF_ACCOUNT_AUTH_KEY=farts` would set the `account_auth_key` key
-    config.merge(config::Environment::with_prefix("CF"))?;
 
     Ok(config)
 }
