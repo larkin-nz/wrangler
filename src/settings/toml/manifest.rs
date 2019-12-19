@@ -9,10 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::commands::validate_worker_name;
 use crate::settings::toml::deploy_target::{DeployTarget, RouteConfig};
-use crate::settings::toml::environment::Environment;
 use crate::settings::toml::kv_namespace::KvNamespace;
 use crate::settings::toml::site::Site;
 use crate::settings::toml::target_type::TargetType;
+use crate::settings::toml::EnvManifest;
 use crate::settings::toml::Target;
 use crate::terminal::emoji;
 use crate::terminal::message;
@@ -42,7 +42,7 @@ pub struct Manifest {
     pub site: Option<Site>,
     #[serde(rename = "kv-namespaces")]
     pub kv_namespaces: Option<Vec<KvNamespace>>,
-    pub env: Option<HashMap<String, Environment>>,
+    pub env: Option<HashMap<String, EnvManifest>>,
 }
 
 impl Manifest {
@@ -209,7 +209,7 @@ impl Manifest {
     fn get_environment(
         &self,
         environment_name: Option<&str>,
-    ) -> Result<Option<&Environment>, failure::Error> {
+    ) -> Result<Option<&EnvManifest>, failure::Error> {
         // check for user-specified environment name
         if let Some(environment_name) = environment_name {
             if let Some(environment_table) = &self.env {

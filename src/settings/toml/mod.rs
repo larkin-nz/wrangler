@@ -1,5 +1,5 @@
 mod deploy_target;
-mod environment;
+mod env_manifest;
 mod kv_namespace;
 mod manifest;
 mod route;
@@ -8,7 +8,7 @@ mod target;
 mod target_type;
 
 pub use deploy_target::{DeployTarget, Zoned, Zoneless};
-pub use environment::Environment;
+pub use env_manifest::EnvManifest;
 pub use kv_namespace::KvNamespace;
 pub use manifest::Manifest;
 pub use route::Route;

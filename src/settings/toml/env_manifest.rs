@@ -5,7 +5,7 @@ use crate::settings::toml::kv_namespace::KvNamespace;
 use crate::settings::toml::site::Site;
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct Environment {
+pub struct EnvManifest {
     pub name: Option<String>,
     pub account_id: Option<String>,
     pub workers_dev: Option<bool>,
@@ -19,7 +19,7 @@ pub struct Environment {
     pub kv_namespaces: Option<Vec<KvNamespace>>,
 }
 
-impl Environment {
+impl EnvManifest {
     pub fn route_config(
         &self,
         top_level_account_id: String,
