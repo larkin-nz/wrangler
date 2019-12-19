@@ -46,8 +46,9 @@ pub struct Manifest {
 }
 
 impl Manifest {
-    pub fn new(config_path: &Path) -> Result<Self, failure::Error> {
         let config = read_config(config_path)?;
+    pub fn standard() -> Result<Self, failure::Error> {
+        let config_path = Path::new("./wrangler.toml");
 
         let manifest: Manifest = match config.try_into() {
             Ok(m) => m,

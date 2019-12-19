@@ -408,8 +408,6 @@ fn run() -> Result<(), failure::Error> {
         )))
         .get_matches();
 
-    let config_path = Path::new("./wrangler.toml");
-
     if let Some(matches) = matches.subcommand_matches("config") {
         // If api-key flag isn't present, use the default auth option (API token)
         let default = !matches.is_present("api-key");
@@ -487,13 +485,13 @@ fn run() -> Result<(), failure::Error> {
         commands::init(name, target_type, site)?;
     } else if let Some(matches) = matches.subcommand_matches("build") {
         log::info!("Getting project settings");
-        let manifest = settings::toml::Manifest::new(config_path)?;
+        let manifest = settings::toml::Manifest::standard()?;
         let env = matches.value_of("env");
         let target = &manifest.get_target(env)?;
         commands::build(&target)?;
     } else if let Some(matches) = matches.subcommand_matches("preview") {
         log::info!("Getting project settings");
-        let manifest = settings::toml::Manifest::new(config_path)?;
+        let manifest = settings::toml::Manifest::standard()?;
         let env = matches.value_of("env");
         let target = manifest.get_target(env)?;
 
@@ -529,7 +527,7 @@ fn run() -> Result<(), failure::Error> {
         }
 
         log::info!("Getting project settings");
-        let manifest = settings::toml::Manifest::new(config_path)?;
+        let manifest = settings::toml::Manifest::standard()?;
         let env = matches.value_of("env");
         let mut target = manifest.get_target(env)?;
         let deploy_target = manifest.deploy_target(env)?;
@@ -539,7 +537,7 @@ fn run() -> Result<(), failure::Error> {
         commands::publish(&user, &mut target, deploy_target, verbose)?;
     } else if let Some(matches) = matches.subcommand_matches("subdomain") {
         log::info!("Getting project settings");
-        let manifest = settings::toml::Manifest::new(config_path)?;
+        let manifest = settings::toml::Manifest::standard()?;
         let env = matches.value_of("env");
         let target = manifest.get_target(env)?;
 
@@ -554,7 +552,7 @@ fn run() -> Result<(), failure::Error> {
             commands::subdomain::get_subdomain(&user, &target)?;
         }
     } else if let Some(kv_matches) = matches.subcommand_matches("kv:namespace") {
-        let manifest = settings::toml::Manifest::new(config_path)?;
+        let manifest = settings::toml::Manifest::standard()?;
         let user = settings::global_user::GlobalUser::new()?;
 
         match kv_matches.subcommand() {
@@ -587,7 +585,7 @@ fn run() -> Result<(), failure::Error> {
             _ => unreachable!(),
         }
     } else if let Some(kv_matches) = matches.subcommand_matches("kv:key") {
-        let manifest = settings::toml::Manifest::new(config_path)?;
+        let manifest = settings::toml::Manifest::standard()?;
         let user = settings::global_user::GlobalUser::new()?;
 
         // Get environment and bindings
@@ -650,7 +648,7 @@ fn run() -> Result<(), failure::Error> {
             _ => unreachable!(),
         }
     } else if let Some(kv_matches) = matches.subcommand_matches("kv:bulk") {
-        let manifest = settings::toml::Manifest::new(config_path)?;
+        let manifest = settings::toml::Manifest::standard()?;
         let user = settings::global_user::GlobalUser::new()?;
 
         // Get environment and bindings
