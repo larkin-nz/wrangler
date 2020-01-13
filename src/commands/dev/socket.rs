@@ -1,47 +1,49 @@
+use std::io;
+use std::thread;
 use std::time::SystemTime;
 
 use chrome_devtools::events::DevtoolsEvent;
 
 use console::style;
 
-use futures::{future, pin_mut, StreamExt};
-use futures_util::sink::SinkExt;
+use futures_old::sync::mpsc;
+use futures_old::{Future, Sink, Stream};
 
 use tokio_tungstenite::connect_async;
 use tungstenite::protocol::Message;
+
+use tokio_old;
 
 use url::Url;
 
 const KEEP_ALIVE_INTERVAL: u64 = 10;
 
-pub async fn listen(session_id: String) -> Result<(), failure::Error> {
+pub fn listen(session_id: String) -> Result<(), failure::Error> {
     let socket_url = format!("wss://rawhttp.cloudflareworkers.com/inspect/{}", session_id);
     let socket_url = Url::parse(&socket_url)?;
 
-    let (ws_stream, _) = connect_async(socket_url)
-        .await
-        .expect("Failed to connect to devtools instance");
+    let (keep_alive_tx, keep_alive_rx) = mpsc::channel(0);
+    thread::spawn(|| keep_alive(keep_alive_tx));
+    let keep_alive_rx = keep_alive_rx.map_err(|_| panic!());
 
-    let (mut write, read) = ws_stream.split();
+    let client = connect_async(socket_url)
+        .and_then(move |(ws_stream, _)| {
+            let (sink, stream) = ws_stream.split();
 
-    let enable_runtime = r#"{
-      "id": 1,
-      "method": "Runtime.enable"
-    }"#;
-    write.send(Message::Text(enable_runtime.into())).await?;
+            let enable_runtime = r#"{
+          "id": 1,
+          "method": "Runtime.enable"
+        }"#;
+            // sink.send(Message::Text(enable_runtime.into())).wait();
 
-    let (keepalive_tx, keepalive_rx) = futures::channel::mpsc::unbounded();
-    tokio::spawn(keep_alive(keepalive_tx));
-    let keepalive_to_ws = keepalive_rx.map(Ok).forward(write);
-
-    let ws_to_stdout = {
-        read.for_each(|msg| {
-            async {
-                let msg = msg.unwrap().into_text().unwrap();
-                log::info!("{}", msg);
-                let msg: Result<DevtoolsEvent, serde_json::Error> = serde_json::from_str(&msg);
-                match msg {
-                    Ok(msg) => match msg {
+            let send_keep_alive = keep_alive_rx.forward(sink);
+            let write_messages = stream.for_each(move |message| {
+                let message = message.into_text().unwrap();
+                log::info!("{}", message);
+                let message: Result<DevtoolsEvent, serde_json::Error> =
+                    serde_json::from_str(&message);
+                match message {
+                    Ok(message) => match message {
                         DevtoolsEvent::ConsoleAPICalled(event) => match event.log_type.as_str() {
                             "log" => println!("{}", style(event).blue()),
                             "error" => eprintln!("{}", style(event).red()),
@@ -56,16 +58,25 @@ pub async fn listen(session_id: String) -> Result<(), failure::Error> {
                         // TODO: change this to a warn after chrome-devtools-rs is parsing all messages
                         log::info!("this event was not parsed as a DevtoolsEvent:\n{}", e);
                     }
-                }
-            }
+                };
+                Ok(())
+            });
+
+            send_keep_alive
+                .map(|_| ())
+                .select(write_messages.map(|_| ()))
+                .then(|_| Ok(()))
         })
-    };
-    pin_mut!(keepalive_to_ws, ws_to_stdout);
-    future::select(keepalive_to_ws, ws_to_stdout).await;
+        .map_err(|e| {
+            println!("Error occurred during websocket: {}", e);
+            io::Error::new(io::ErrorKind::Other, e)
+        });
+
+    tokio_old::runtime::run(client.map_err(|_| ()));
     Ok(())
 }
 
-async fn keep_alive(tx: futures::channel::mpsc::UnboundedSender<Message>) {
+fn keep_alive(mut tx: mpsc::Sender<Message>) {
     let mut keep_alive_time = SystemTime::now();
     let mut id = 2;
     loop {
@@ -78,7 +89,9 @@ async fn keep_alive(tx: futures::channel::mpsc::UnboundedSender<Message>) {
             }}"#,
                 id
             );
-            tx.unbounded_send(Message::Text(keep_alive_message.into()))
+            tx = tx
+                .send(Message::Text(keep_alive_message.into()))
+                .wait()
                 .unwrap();
             id += 1;
             keep_alive_time = SystemTime::now();
